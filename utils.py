@@ -2,10 +2,10 @@ from datetime import date, timedelta
 from calendar import monthrange
 
 
-def get_weekends_date(start_date: date) -> list[date]:
+def get_weekends_date(start_date: date, end_date: date) -> list[date]:
     today = start_date
     weekends: list[date] = []
-    while today.day != monthrange(today.year, today.month)[1]:
+    while today != end_date:
         if today.weekday() >= 5:
             weekends.append(today)
         today += timedelta(1)

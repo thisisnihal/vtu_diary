@@ -1,0 +1,331 @@
+<!doctype html>
+<html>
+<head>
+  <title>VTU Internship Auto</title>
+
+  <!-- FullCalendar -->
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      padding: 2rem 2rem 6rem 2rem;
+      max-width: 1000px;
+      margin: auto;
+    }
+
+    #calendar {
+      max-width: 900px;
+      margin: 20px auto;
+    }
+
+    textarea {
+      width: 900px;
+      border-radius: 1rem;
+      padding: 0.75rem;
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+    }
+
+    input, select {
+      padding: 6px;
+      margin: 6px;
+    }
+
+    button {
+      padding: 8px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-top: 15px;
+      border: 1px solid #888;
+      font-weight: 600;
+    }
+
+    button:hover {
+      background-color: #a7a7a7;
+    }
+
+    button:active {
+      background-color: #686868;
+      color: white;
+    }
+
+    #review_section {
+      display: none;
+      margin-top: 3rem;
+    }
+
+    hr {
+      margin: 50px 0;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>VTU Internship Automation</h2>
+
+<!-- ================= DATE SECTION ================= -->
+
+<div>
+  <label>
+    Start Date:
+    <input type="date" id="start_date" />
+  </label>
+
+  <label style="margin-left: 20px">
+    End Date:
+    <input type="date" id="end_date" />
+  </label>
+</div>
+
+<div style="margin-top: 15px; font-size: 14px">
+  <span style="display:inline-block;width:12px;height:12px;background:rgb(242,86,86);margin-right:5px;"></span>
+  Holiday
+
+  <span style="display:inline-block;width:12px;height:12px;background:#f0f0f0;margin-left:20px;margin-right:5px;"></span>
+  Weekend
+</div>
+
+<div id="calendar"></div>
+
+<!-- ================= CONTENT INPUT ================= -->
+
+<div style="margin-top: 2rem;">
+  <label style="font-weight: 600;">Enter Internship Details</label>
+  <br />
+  <textarea
+    id="internship_content"
+    style="height: 200px;"
+    placeholder="Tech stack, Project details, blockers..."
+  ></textarea>
+</div>
+
+<br />
+<button onclick="submitData()">Generate Content</button>
+
+<!-- ================= REVIEW SECTION ================= -->
+
+<div id="review_section">
+  <h3>Review & Modify Generated JSON</h3>
+
+  <textarea id="review_textarea" style="height: 400px;"></textarea>
+
+  <br />
+  <button onclick="saveFinal()">Save Final</button>
+</div>
+
+<hr>
+
+<!-- ================= RUN AUTOMATION SECTION ================= -->
+
+<h3>Run Saved Internship Automation</h3>
+
+<select id="internship_select">
+  <option value="">Select Internship File</option>
+</select>
+
+<br />
+<button onclick="runAutomation()">Run Automation</button>
+
+<!-- ================= SCRIPT ================= -->
+
+<script>
+let calendar;
+let selectedHolidays = new Set();
+let startDate = null;
+let endDate = null;
+
+document.addEventListener("DOMContentLoaded", function () {
+
+  calendar = new FullCalendar.Calendar(
+    document.getElementById("calendar"),
+    {
+      initialView: "dayGridMonth",
+      firstDay: 1,
+
+      dayCellDidMount: function (info) {
+        const day = info.date.getDay();
+        if (day === 0 || day === 6) {
+          info.el.style.backgroundColor = "#f0f0f0";
+        }
+      },
+
+      dateClick: function (info) {
+        const clicked = info.dateStr;
+
+        if (!startDate || !endDate) return;
+        if (clicked < startDate || clicked > endDate) return;
+
+        if (selectedHolidays.has(clicked)) {
+          selectedHolidays.delete(clicked);
+          removeHighlight(clicked);
+        } else {
+          selectedHolidays.add(clicked);
+          highlightDate(clicked);
+        }
+      }
+    }
+  );
+
+  calendar.render();
+
+  document.getElementById("start_date").addEventListener("change", updateRange);
+  document.getElementById("end_date").addEventListener("change", updateRange);
+
+  loadInternships();
+});
+
+function updateRange() {
+  startDate = document.getElementById("start_date").value;
+  endDate = document.getElementById("end_date").value;
+
+  if (startDate && endDate) {
+    calendar.setOption("validRange", {
+      start: startDate,
+      end: addOneDay(endDate)
+    });
+
+    calendar.getEvents().forEach(e => e.remove());
+    selectedHolidays.clear();
+    addWeekends();
+  }
+}
+
+function highlightDate(date) {
+  calendar.addEvent({
+    id: date,
+    start: date,
+    display: "background",
+    backgroundColor: "rgb(242,86,86)"
+  });
+}
+
+function removeHighlight(date) {
+  const event = calendar.getEventById(date);
+  if (event) event.remove();
+}
+
+function addWeekends() {
+  let current = new Date(startDate);
+  let end = new Date(endDate);
+
+  while (current <= end) {
+    const day = current.getDay();
+    const formatted = current.toISOString().split("T")[0];
+
+    if (day === 0 || day === 6) {
+      selectedHolidays.add(formatted);
+      highlightDate(formatted);
+    }
+
+    current.setDate(current.getDate() + 1);
+  }
+}
+
+function addOneDay(dateStr) {
+  let date = new Date(dateStr);
+  date.setDate(date.getDate() + 1);
+  return date.toISOString().split("T")[0];
+}
+
+//////////////////////////////////////////////////////
+// GENERATE JSON
+//////////////////////////////////////////////////////
+
+function submitData() {
+
+  if (!startDate || !endDate) {
+    alert("Select start and end date");
+    return;
+  }
+
+  fetch("/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      start_date: startDate,
+      end_date: endDate,
+      holidays: Array.from(selectedHolidays),
+      content: document.getElementById("internship_content").value
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById("review_section").style.display = "block";
+    document.getElementById("review_textarea").value =
+      JSON.stringify(data.generated_json, null, 4);
+  });
+}
+
+//////////////////////////////////////////////////////
+// SAVE FINAL JSON
+//////////////////////////////////////////////////////
+
+function saveFinal() {
+
+  fetch("/save_final", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      start_date: startDate,
+      end_date: endDate,
+      edited_json: JSON.parse(document.getElementById("review_textarea").value)
+    })
+  })
+  .then(res => res.json())
+  .then(() => {
+    alert("Saved successfully!");
+    loadInternships();
+  });
+}
+
+//////////////////////////////////////////////////////
+// LIST FILES
+//////////////////////////////////////////////////////
+
+function loadInternships() {
+  fetch("/internships")
+    .then(res => res.json())
+    .then(data => {
+      const select = document.getElementById("internship_select");
+      select.innerHTML = '<option value="">Select Internship File</option>';
+
+      data.files.forEach(file => {
+        const option = document.createElement("option");
+        option.value = file;
+        option.textContent = file;
+        select.appendChild(option);
+      });
+    });
+}
+
+//////////////////////////////////////////////////////
+// RUN AUTOMATION
+//////////////////////////////////////////////////////
+
+function runAutomation() {
+
+  const file = document.getElementById("internship_select").value;
+
+  if (!file) {
+    alert("Select a file first");
+    return;
+  }
+
+  fetch("/run_automation", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ internship_file: file })
+  })
+  .then(res => res.json())
+  .then(() => {
+    alert("Automation Started!");
+  });
+}
+
+</script>
+
+</body>
+</html>

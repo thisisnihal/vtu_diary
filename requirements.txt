@@ -1,3 +1,4 @@
 pydantic-settings
 google-genai
 playwright
+flask

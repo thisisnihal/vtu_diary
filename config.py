@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     VTU_PASSWORD: str = ""
     
     DAILY_WORK_HRS: int = 8
+    
     class Config:
         env_file = ".env"
         env_file_encoding='utf-8'
