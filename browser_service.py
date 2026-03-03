@@ -47,8 +47,12 @@ def run_actions(page: Page, context: BrowserContext, current_date: date, data):
         pop_up.first.wait_for(state="visible")
         pop_up.first.click()
 
-    open_diary_page(page, context, current_date)
-    create_diary_entry(page,context, data)
+    opened = open_diary_page(page, context, current_date)
+
+    if not opened:
+        return
+
+    create_diary_entry(page, context, data)
 
 
 def check_login(page: Page, context: BrowserContext):
@@ -67,19 +71,19 @@ def check_login(page: Page, context: BrowserContext):
         print(f"Login exception: {e}")
 
 
-def open_diary_page(page: Page, context: BrowserContext, current_date: date):
+def open_diary_page(page: Page, context: BrowserContext, current_date: date) -> bool:
     try:
         check_login(page, context)
 
         if current_date.weekday() > 5:
-            return
+            return False
 
         page.goto(
             "https://vtu.internyet.in/dashboard/student/student-diary",
             wait_until="networkidle",
         )
 
-        page.locator("#internship_id").wait_for(state="visible")
+        page.locator("#internship_id").wait_for(state="visible", timeout=10000)
         page.locator("#internship_id").click()
         page.keyboard.press("Enter")
 
@@ -98,8 +102,19 @@ def open_diary_page(page: Page, context: BrowserContext, current_date: date):
 
         page.get_by_role("button", name="Continue").click()
 
-    except Exception as e:
-        print(f"Diary page exception: {e}")
+        page.get_by_placeholder("Briefly describe the work you did today…").wait_for(
+            state="visible",
+            timeout=15000
+        )
+
+        return True
+
+    except Exception:
+        page.goto(
+            "https://vtu.internyet.in/dashboard/student",
+            wait_until="networkidle",
+        )
+        return False
 
 
 def create_diary_entry(page: Page, context: BrowserContext, data):
